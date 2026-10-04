@@ -6,7 +6,7 @@
 #include <unordered_set>
 #include <sstream>
 
-bool hasMultipleSpaces(std::string_view line) {
+bool hasMultipleSpaces(const std::string& line) {
     for (std::size_t i = 1; i < line.size(); ++i) {
         if (line[i] == ' ' && line[i - 1] == ' ') {
             return true;
@@ -33,13 +33,13 @@ int main() {
             std::cout << "INVALID\n"; continue;
         }else {
 
-            std::string_view version_number = v.substr(5);
+            std::string version_number = v.substr(5);
             const std::size_t dot = version_number.find('.');
             if (dot == std::string::npos || dot == 0 || dot == version_number.size() - 1){
                 valid = false ;
             }else {
-                const std::string_view major= version_number.substr(0 , dot);
-                const std::string_view minor = version_number.substr(dot + 1);
+                const std::string major= version_number.substr(0 , dot);
+                const std::string minor = version_number.substr(dot + 1);
 
 
                 for (const char ch: major){
