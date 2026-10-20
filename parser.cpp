@@ -8,25 +8,17 @@ RequestLine Parser::parseRequestLine(std::string request)
     HttpMethods method;
 
     bool valid = true;
-    std::istringstream stream(request);
-    std::string m, p, v, extra;
-    stream >> m >> p >> v;
-    if (request.empty())
-    {
-        valid = false;
-    }
+    std::string m, p, v;
     if (!request.empty() && request.back() == '\r')
         request.pop_back();
 
     std::istringstream iss(request);
+    std::string extra;
     if (!(iss >> m >> p >> v) || iss >> extra)
     {
         valid = false;
     }
-    if (p.empty() || p[0] != '/' || v.rfind("HTTP/", 0) != 0)
-    {
-        valid = false;
-    }
+
     method = parseHttpMethod(m);
     if (method == HttpMethods::UNKNOWN || !methods_values.count(m))
     {
@@ -37,40 +29,49 @@ RequestLine Parser::parseRequestLine(std::string request)
     {
         valid = false;
     }
-    if (v.empty())
+
+    if (v.empty() || p.empty() || p[0] != '/' || v.rfind("HTTP/", 0) != 0)
     {
         valid = false;
     }
     else
     {
-        std::string version_number = v.substr(5);
-        const std::size_t dot = version_number.find('.');
-        if (dot == std::string::npos || dot == 0 || dot == version_number.size() - 1)
+        if (v.size() < 5)
         {
             valid = false;
         }
         else
         {
-            const std::string major = version_number.substr(0, dot);
-            const std::string minor = version_number.substr(dot + 1);
-
-            for (const char ch : major)
+            std::string version_number = v.substr(5);
+            const std::size_t dot = version_number.find('.');
+            if (dot == std::string::npos || dot == 0 || dot == version_number.size() - 1)
             {
-                if (!std::isdigit(static_cast<unsigned char>(ch)))
-                {
-                    valid = false;
-                }
+                valid = false;
             }
-
-            for (const char ch : minor)
+            else
             {
-                if (!std::isdigit(static_cast<unsigned char>(ch)))
+                const std::string major = version_number.substr(0, dot);
+                const std::string minor = version_number.substr(dot + 1);
+
+                for (const char ch : major)
                 {
-                    valid = false;
+                    if (!std::isdigit(static_cast<unsigned char>(ch)))
+                    {
+                        valid = false;
+                    }
+                }
+
+                for (const char ch : minor)
+                {
+                    if (!std::isdigit(static_cast<unsigned char>(ch)))
+                    {
+                        valid = false;
+                    }
                 }
             }
         }
     }
+
     if (!valid)
     {
         return RequestLine{HttpMethods::UNKNOWN, "0", "0"}; // convection for invalid request
@@ -103,7 +104,7 @@ HttpMethods Parser::parseHttpMethod(const std::string &method) const
         return HttpMethods::PUT;
     if (method == "PATCH")
         return HttpMethods::PATCH;
-    if (method == "OPTION")
+    if (method == "OPTIONS")
         return HttpMethods::OPTIONS;
     if (method == "HEAD")
         return HttpMethods::HEAD;
@@ -124,7 +125,66 @@ std::string Parser::httpMethodToString(const HttpMethods &http) const
         return "PATCH";
     case HttpMethods::PUT:
         return "PUT";
+    case HttpMethods::OPTIONS:
+        return "OPTIONS";
+    case HttpMethods::HEAD:
+        return "HEAD";
     default:
         return "UNKNOWN";
     }
+}
+
+/*
+========================== HEADERS ===============================
+*/
+
+std::string Parser::headerError(HeaderError error)
+{
+    switch (error)
+    {
+    case HeaderError::NO_COLON:
+        return "malformed";
+    case HeaderError::BAD_NAME:
+        return "bad-name";
+    case HeaderError::FOLD:
+        return "fold";
+    case HeaderError::LINE_ENDING:
+        return "line-ending";
+    case HeaderError::HOST:
+        return "host";
+    case HeaderError::INCOMPLETE:
+        return "incomplete";
+    default:
+        return "malformed";
+    }
+}
+
+std::string Parser::parseHeaderLine(const std::string &line)
+{
+    const std::size_t colon_pos = line.find(':');
+    if (colon_pos == std::string::npos)
+    {
+        return "ERR " + headerError(HeaderError::NO_COLON) + ": " + line;
+    }
+
+    const std::string name = UTILS::toLower(line.substr(0, colon_pos));
+    const std::string value = UTILS::trim(line.substr(colon_pos + 1));
+
+    return name + ": " + value;
+}
+
+std::string Parser::parseHeaders()
+{
+    std::string line;
+    while (std::getline(std::cin, line))
+    {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        if (line.empty())
+            break;
+
+        std::cout << parseHeaderLine(line) << '\n';
+    }
+    return "";
 }
